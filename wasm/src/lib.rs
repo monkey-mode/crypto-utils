@@ -4,15 +4,10 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub fn hash_string(input: &str, salt: &str) -> String {
-    // Combine input and salt (matching Go: cardId + salt)
-    let combined = format!("{}{}", input, salt);
-
-    // Hash using SHA-256 (matching Go: sha256.Sum256([]byte(encryptedCardId)))
-    let hash = Sha256::digest(combined.as_bytes());
-
-    // Convert to hex string (matching Go: hex.EncodeToString(sum[:]))
-    // Convert GenericArray to &[u8] slice explicitly
-    hex::encode(&hash[..])
+    let mut hasher = Sha256::new();
+    hasher.update(input);
+    hasher.update(salt);
+    format!("{:x}", hasher.finalize())
 }
 
 #[wasm_bindgen]
