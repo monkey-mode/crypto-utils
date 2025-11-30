@@ -21,6 +21,10 @@ if ! command -v rustc &> /dev/null; then
         export PATH="$CARGO_HOME/bin:$PATH"
     fi
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
+    # Source cargo env to make Rust available immediately
+    if [ -f "$CARGO_HOME/env" ]; then
+        source "$CARGO_HOME/env"
+    fi
     echo "Rust installed successfully!"
 else
     echo "Rust is already installed: $(rustc --version)"
