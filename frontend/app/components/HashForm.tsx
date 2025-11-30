@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { loadWasmModule } from "../utils/wasm-loader";
+import { useWasm } from "../contexts/WasmContext";
 import HashResultRow from "./HashResultRow";
 import InputRow from "./InputRow";
 import ModeToggle from "./ModeToggle";
@@ -9,6 +9,7 @@ import ModeToggle from "./ModeToggle";
 type HashMode = "single" | "multiple";
 
 export default function HashForm() {
+  const { wasmReady, wasmModule, error: wasmError } = useWasm();
   const [mode, setMode] = useState<HashMode>("single");
   const [input, setInput] = useState("");
   const [inputs, setInputs] = useState<string[]>([""]);
@@ -16,7 +17,6 @@ export default function HashForm() {
   const [hash, setHash] = useState("");
   const [hashes, setHashes] = useState<Array<{ value: string; hash: string }>>([]);
   const [loading, setLoading] = useState(false);
-  const [wasmReady, setWasmReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const inputScrollRef = useRef<HTMLDivElement>(null);
@@ -24,19 +24,14 @@ export default function HashForm() {
   const isScrolling = useRef(false);
 
   useEffect(() => {
-    // Ensure this only runs on client
     setMounted(true);
-    // Load WASM module on component mount
-    loadWasmModule()
-      .then(() => {
-        setWasmReady(true);
-        setError(null);
-      })
-      .catch((err) => {
-        setError("Failed to load WASM module. Please build the WASM module first.");
-        console.error(err);
-      });
   }, []);
+
+  useEffect(() => {
+    if (wasmError) {
+      setError(wasmError);
+    }
+  }, [wasmError]);
 
   const handleHash = async () => {
     if (!salt.trim()) {
@@ -72,9 +67,13 @@ export default function HashForm() {
       setHashes([]); // Clear previous multiple mode hashes
     }
 
-    try {
-      const wasmModule = await loadWasmModule();
+    if (!wasmModule) {
+      setError("WASM module is not loaded yet");
+      setLoading(false);
+      return;
+    }
 
+    try {
       if (mode === "single") {
         const result = wasmModule.hash_string(input, salt);
         setHash(result);
