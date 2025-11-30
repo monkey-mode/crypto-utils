@@ -113,6 +113,36 @@ A Next.js web application providing cryptographic utilities powered by Rust WebA
    bun run start
    ```
 
+## Deploying to Vercel
+
+The project is configured for Vercel deployment with `vercel.json`. 
+
+**Prerequisites:**
+- Vercel account
+- Rust toolchain (Vercel will install it automatically if needed)
+
+**Deployment Steps:**
+
+1. **Connect your repository to Vercel:**
+   - Go to [vercel.com](https://vercel.com)
+   - Import your Git repository
+   - Vercel will auto-detect the Next.js framework
+
+2. **Configure build settings** (if needed):
+   - Root Directory: `frontend`
+   - Build Command: `npm run build:wasm && npm run build` (auto-detected)
+   - Output Directory: `.next` (auto-detected)
+
+3. **Deploy:**
+   - Vercel will automatically build and deploy on every push to your main branch
+   - The build process will:
+     1. Install dependencies
+     2. Build the WASM module (requires Rust)
+     3. Build the Next.js application
+     4. Deploy to Vercel's edge network
+
+**Note:** The first build may take longer as Vercel installs Rust and wasm-pack. Subsequent builds will be faster due to caching.
+
 ## How It Works
 
 1. **Rust WASM Module** (`wasm/src/lib.rs`):

@@ -1,0 +1,6 @@
+node_modules
+.wasm
+wasm/target
+*.log
+.DS_Store
+
