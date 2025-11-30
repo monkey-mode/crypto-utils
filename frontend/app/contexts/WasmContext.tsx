@@ -10,6 +10,10 @@ interface WasmModule {
   decrypt: (key: string, nonce_ciphertext: string) => string;
   decrypt_with_nonce: (key: string, nonce: string, ciphertext: string) => string;
   generate_key: () => string;
+  encrypt_file: (key: string, file_data: Uint8Array) => Uint8Array;
+  encrypt_file_with_nonce: (key: string, nonce: string, file_data: Uint8Array) => Uint8Array;
+  decrypt_file: (key: string, file_data: Uint8Array) => Uint8Array;
+  decrypt_file_with_nonce: (key: string, nonce: string, file_data: Uint8Array) => Uint8Array;
 }
 
 interface WasmContextType {

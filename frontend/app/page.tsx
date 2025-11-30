@@ -1,6 +1,7 @@
 "use client";
 
 import { startTransition, useEffect, useLayoutEffect, useState } from "react";
+import EncryptDecryptFileForm from "./components/EncryptDecryptFileForm";
 import EncryptDecryptForm from "./components/EncryptDecryptForm";
 import HashForm from "./components/HashForm";
 
@@ -56,9 +57,9 @@ export default function Home() {
                 <span className="text-base">🔒</span>
                 <span>Encrypt/Decrypt</span>
               </button>
-              <button onClick={() => setActiveTab("feature3")} className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${activeTab === "feature3" ? "bg-white dark:bg-zinc-700 text-black dark:text-zinc-50 shadow-sm" : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-zinc-50"}`} disabled>
-                <span className="text-base">🚀</span>
-                <span>Feature 3</span>
+              <button onClick={() => setActiveTab("feature3")} className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${activeTab === "feature3" ? "bg-white dark:bg-zinc-700 text-black dark:text-zinc-50 shadow-sm" : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-zinc-50"}`}>
+                <span className="text-base">📁</span>
+                <span>Encrypt/Decrypt File</span>
               </button>
             </div>
           )}
@@ -74,11 +75,9 @@ export default function Home() {
                 <EncryptDecryptForm />
               </div>
 
-              {activeTab === "feature3" && (
-                <div className="text-center py-12">
-                  <p className="text-zinc-600 dark:text-zinc-400">Feature 3 - Coming Soon</p>
-                </div>
-              )}
+              <div className={activeTab === "feature3" ? "" : "hidden"}>
+                <EncryptDecryptFileForm />
+              </div>
             </>
           )}
         </div>
