@@ -238,7 +238,7 @@ export default function HashForm() {
             <label htmlFor="input" className="block text-xs font-medium text-black dark:text-zinc-50 mb-1.5">
               Input String
             </label>
-            <input id="input" type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Enter string to hash" className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
+            <textarea id="input" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Enter string to hash" rows={4} className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 resize-y" />
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5">Supports newlines in the input string.</p>
           </div>
         )}
