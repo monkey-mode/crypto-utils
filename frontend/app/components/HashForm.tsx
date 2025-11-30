@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useWasm } from "../contexts/WasmContext";
 import HashResultRow from "./HashResultRow";
 import InputRow from "./InputRow";
 import ModeToggle from "./ModeToggle";
 
 type HashMode = "single" | "multiple";
+
+const STORAGE_KEY_HASH_MODE = "mfoa-utils-hash-mode";
 
 export default function HashForm() {
   const { wasmReady, wasmModule, error: wasmError } = useWasm();
@@ -19,6 +21,25 @@ export default function HashForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+
+  // Load saved mode from localStorage and mark as mounted
+  // Using useLayoutEffect to synchronously update before paint to avoid hydration mismatch
+  useLayoutEffect(() => {
+    const savedMode = localStorage.getItem(STORAGE_KEY_HASH_MODE);
+    startTransition(() => {
+      if (savedMode === "single" || savedMode === "multiple") {
+        setMode(savedMode);
+      }
+      setMounted(true);
+    });
+  }, []);
+
+  // Save mode to localStorage when it changes (only after mount)
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem(STORAGE_KEY_HASH_MODE, mode);
+    }
+  }, [mode, mounted]);
   const inputScrollRef = useRef<HTMLDivElement>(null);
   const resultScrollRef = useRef<HTMLDivElement>(null);
   const isScrolling = useRef(false);
@@ -161,6 +182,7 @@ export default function HashForm() {
     if (newMode === "multiple" && inputs.length === 0) {
       setInputs([""]);
     }
+    // Mode is saved to localStorage via useEffect
   };
 
   const handleCopy = (textToCopy: string) => {

@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useLayoutEffect, useState } from "react";
 import { useWasm } from "../contexts/WasmContext";
 
 type EncryptMode = "encrypt" | "decrypt";
+
+const STORAGE_KEY_ENCRYPT_MODE = "mfoa-utils-encrypt-mode";
 
 export default function EncryptDecryptForm() {
   const { wasmReady, wasmModule, error: wasmError } = useWasm();
@@ -20,6 +22,25 @@ export default function EncryptDecryptForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+
+  // Load saved mode from localStorage and mark as mounted
+  // Using useLayoutEffect to synchronously update before paint to avoid hydration mismatch
+  useLayoutEffect(() => {
+    const savedMode = localStorage.getItem(STORAGE_KEY_ENCRYPT_MODE);
+    startTransition(() => {
+      if (savedMode === "encrypt" || savedMode === "decrypt") {
+        setMode(savedMode);
+      }
+      setMounted(true);
+    });
+  }, []);
+
+  // Save mode to localStorage when it changes (only after mount)
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem(STORAGE_KEY_ENCRYPT_MODE, mode);
+    }
+  }, [mode, mounted]);
 
   useEffect(() => {
     setMounted(true);
