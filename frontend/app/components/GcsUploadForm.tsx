@@ -61,9 +61,23 @@ export default function GcsUploadForm() {
     }
   }, [pathLocation, mounted]);
 
+  const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB in bytes
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
     if (selectedFiles.length > 0) {
+      // Check file sizes
+      const oversizedFiles = selectedFiles.filter((file) => file.size > MAX_FILE_SIZE);
+      if (oversizedFiles.length > 0) {
+        const fileNames = oversizedFiles.map((f) => f.name).join(", ");
+        setError(`File size limit exceeded (4MB max): ${fileNames}. Please select smaller files.`);
+        setFiles([]);
+        setUploadProgress(new Map());
+        // Reset file input
+        e.target.value = "";
+        return;
+      }
+
       setFiles(selectedFiles);
       setError(null);
       setSuccess(null);
@@ -84,6 +98,23 @@ export default function GcsUploadForm() {
 
   const uploadFile = async (file: File, index: number): Promise<void> => {
     const fileKey = `${file.name}-${index}`;
+
+    // Check file size before uploading
+    if (file.size > MAX_FILE_SIZE) {
+      setUploadProgress((prev) => {
+        const updated = new Map(prev);
+        const current = updated.get(fileKey);
+        if (current) {
+          updated.set(fileKey, {
+            ...current,
+            status: "error",
+            error: `File size (${formatFileSize(file.size)}) exceeds 4MB limit`
+          });
+        }
+        return updated;
+      });
+      throw new Error(`File size exceeds 4MB limit`);
+    }
 
     // Update status to uploading
     setUploadProgress((prev) => {
@@ -219,6 +250,14 @@ export default function GcsUploadForm() {
       return;
     }
 
+    // Check file sizes before upload
+    const oversizedFiles = files.filter((file) => file.size > MAX_FILE_SIZE);
+    if (oversizedFiles.length > 0) {
+      const fileNames = oversizedFiles.map((f) => `${f.name} (${formatFileSize(f.size)})`).join(", ");
+      setError(`File size limit exceeded (4MB max): ${fileNames}`);
+      return;
+    }
+
     if (!bucketName.trim()) {
       setError("Please enter a bucket name");
       return;
@@ -349,7 +388,7 @@ export default function GcsUploadForm() {
       <div className="space-y-3 mx-auto max-w-2xl">
         <div>
           <label htmlFor="gcs-file-input" className="block text-xs font-medium text-black dark:text-zinc-50 mb-1.5">
-            Files to Upload (Multiple files supported)
+            Files to Upload (Multiple files supported) <span className="text-zinc-500">(Max 4MB per file)</span>
           </label>
           <input id="gcs-file-input" type="file" multiple onChange={handleFileChange} className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
           {files.length > 0 && (
@@ -391,25 +430,11 @@ export default function GcsUploadForm() {
                 <div key={key} className="border border-zinc-300 dark:border-zinc-700 rounded-lg p-2">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-black dark:text-zinc-50 truncate flex-1 mr-2">{progress.file.name}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      progress.status === "success" ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300" :
-                      progress.status === "error" ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300" :
-                      progress.status === "processing" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300" :
-                      progress.status === "uploading" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300" :
-                      "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
-                    }`}>
-                      {progress.status === "success" ? "✓ Success" :
-                       progress.status === "error" ? "✗ Error" :
-                       progress.status === "processing" ? "⏳ Processing..." :
-                       progress.status === "uploading" ? `Uploading ${progress.progress}%` :
-                       "Pending"}
-                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded ${progress.status === "success" ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300" : progress.status === "error" ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300" : progress.status === "processing" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300" : progress.status === "uploading" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"}`}>{progress.status === "success" ? "✓ Success" : progress.status === "error" ? "✗ Error" : progress.status === "processing" ? "⏳ Processing..." : progress.status === "uploading" ? `Uploading ${progress.progress}%` : "Pending"}</span>
                   </div>
                   {(progress.status === "uploading" || progress.status === "processing") && (
                     <div className="w-full bg-zinc-200 dark:bg-zinc-700 rounded-full h-1.5 mt-1">
-                      <div className={`h-1.5 rounded-full transition-all duration-300 ${
-                        progress.status === "processing" ? "bg-yellow-500 animate-pulse" : "bg-blue-600"
-                      }`} style={{ width: `${progress.progress}%` }} />
+                      <div className={`h-1.5 rounded-full transition-all duration-300 ${progress.status === "processing" ? "bg-yellow-500 animate-pulse" : "bg-blue-600"}`} style={{ width: `${progress.progress}%` }} />
                     </div>
                   )}
                   {progress.status === "error" && progress.error && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{progress.error}</p>}
