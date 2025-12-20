@@ -3,9 +3,10 @@
 import { startTransition, useEffect, useLayoutEffect, useState } from "react";
 import EncryptDecryptFileForm from "./components/EncryptDecryptFileForm";
 import EncryptDecryptForm from "./components/EncryptDecryptForm";
+import GcsUploadForm from "./components/GcsUploadForm";
 import HashForm from "./components/HashForm";
 
-type FeatureTab = "feature1" | "feature2" | "feature3";
+type FeatureTab = "feature1" | "feature2" | "feature3" | "feature4";
 
 const STORAGE_KEY_FEATURE = "mfoa-utils-active-feature";
 const MIN_DESKTOP_WIDTH = 1024; // Minimum width for desktop (lg breakpoint)
@@ -35,7 +36,7 @@ export default function Home() {
   useLayoutEffect(() => {
     const savedFeature = localStorage.getItem(STORAGE_KEY_FEATURE);
     startTransition(() => {
-      if (savedFeature && (savedFeature === "feature1" || savedFeature === "feature2" || savedFeature === "feature3")) {
+      if (savedFeature && (savedFeature === "feature1" || savedFeature === "feature2" || savedFeature === "feature3" || savedFeature === "feature4")) {
         setActiveTab(savedFeature as FeatureTab);
       }
       // Smooth transition by delaying mount slightly
@@ -84,7 +85,7 @@ export default function Home() {
 
           {/* Feature Tabs */}
           {mounted && (
-            <div className="flex gap-2 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg mb-6 max-w-2xl mx-auto fade-in">
+            <div className="flex gap-2 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg mb-6 max-w-4xl mx-auto fade-in">
               <button onClick={() => setActiveTab("feature1")} className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${activeTab === "feature1" ? "bg-white dark:bg-zinc-700 text-black dark:text-zinc-50 shadow-sm" : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-zinc-50"}`}>
                 <span className="text-base">🔐</span>
                 <span>Hash</span>
@@ -96,6 +97,10 @@ export default function Home() {
               <button onClick={() => setActiveTab("feature3")} className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${activeTab === "feature3" ? "bg-white dark:bg-zinc-700 text-black dark:text-zinc-50 shadow-sm" : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-zinc-50"}`}>
                 <span className="text-base">📁</span>
                 <span>Encrypt/Decrypt File</span>
+              </button>
+              <button onClick={() => setActiveTab("feature4")} className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${activeTab === "feature4" ? "bg-white dark:bg-zinc-700 text-black dark:text-zinc-50 shadow-sm" : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-zinc-50"}`}>
+                <span className="text-base">☁️</span>
+                <span>GCS Upload</span>
               </button>
             </div>
           )}
@@ -113,6 +118,10 @@ export default function Home() {
 
               <div className={activeTab === "feature3" ? "" : "hidden"}>
                 <EncryptDecryptFileForm />
+              </div>
+
+              <div className={activeTab === "feature4" ? "" : "hidden"}>
+                <GcsUploadForm />
               </div>
             </>
           )}
