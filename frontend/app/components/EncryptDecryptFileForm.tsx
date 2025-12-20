@@ -166,6 +166,7 @@ export default function EncryptDecryptFileForm() {
           result = wasmModule.encrypt_file(key, fileData);
         }
         setEncryptResult(result);
+        setError(null);
       } else {
         if (decryptUseNonce) {
           result = wasmModule.decrypt_file_with_nonce(key, decryptNonce, fileData);
@@ -173,10 +174,25 @@ export default function EncryptDecryptFileForm() {
           result = wasmModule.decrypt_file(key, fileData);
         }
         setDecryptResult(result);
+        setError(null);
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      // Extract error message from JsValue or Error
+      let errorMessage = "Unknown error";
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === "string") {
+        errorMessage = err;
+      } else if (err && typeof err === "object" && "message" in err) {
+        errorMessage = String(err.message);
+      }
       setError(`File ${mode} failed: ${errorMessage}`);
+      // Clear results on error
+      if (mode === "encrypt") {
+        setEncryptResult(null);
+      } else {
+        setDecryptResult(null);
+      }
       console.error(err);
     } finally {
       setLoading(false);

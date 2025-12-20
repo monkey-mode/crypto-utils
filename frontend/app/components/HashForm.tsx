@@ -5,6 +5,7 @@ import { useWasm } from "../contexts/WasmContext";
 import HashResultRow from "./HashResultRow";
 import InputRow from "./InputRow";
 import ModeToggle from "./ModeToggle";
+import CopyIconButton from "./CopyIconButton";
 
 type HashMode = "single" | "multiple";
 
@@ -331,16 +332,14 @@ export default function HashForm() {
       {/* Single Mode Result */}
       {mode === "single" && hash && (
         <div className="mt-4 max-w-2xl mx-auto">
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="block text-xs font-medium text-black dark:text-zinc-50">Hash Result (SHA-256)</label>
-            <button onClick={() => handleCopy(hash)} className="text-blue-600 dark:text-blue-400 hover:opacity-80 active:opacity-60 active:scale-95 transition-all" title="Copy hash">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </button>
-          </div>
-          <div className="max-h-64 overflow-y-auto p-3 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-300 dark:border-zinc-700">
-            <code className="text-xs text-black dark:text-zinc-50 break-all font-mono">{hash}</code>
+          <label className="block text-xs font-medium text-black dark:text-zinc-50 mb-1.5">Hash Result (SHA-256)</label>
+          <div className="flex gap-2 items-stretch">
+            <div className="flex-1 min-w-0 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-300 dark:border-zinc-700 flex items-center">
+              <code className="text-xs text-black dark:text-zinc-50 break-all font-mono w-full" title={hash}>
+                {hash}
+              </code>
+            </div>
+            <CopyIconButton onClick={() => handleCopy(hash)} title="Copy hash" />
           </div>
         </div>
       )}
