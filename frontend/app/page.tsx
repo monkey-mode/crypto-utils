@@ -8,10 +8,26 @@ import HashForm from "./components/HashForm";
 type FeatureTab = "feature1" | "feature2" | "feature3";
 
 const STORAGE_KEY_FEATURE = "mfoa-utils-active-feature";
+const MIN_DESKTOP_WIDTH = 1024; // Minimum width for desktop (lg breakpoint)
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<FeatureTab>("feature1");
   const [mounted, setMounted] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  // Check if screen is desktop size
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsDesktop(window.innerWidth >= MIN_DESKTOP_WIDTH);
+    };
+
+    // Check on mount
+    checkScreenSize();
+
+    // Listen for resize events
+    window.addEventListener("resize", checkScreenSize);
+    return () => window.removeEventListener("resize", checkScreenSize);
+  }, []);
 
   // Load saved feature from localStorage and mark as mounted
   // Using useLayoutEffect to synchronously update before paint to avoid hydration mismatch
@@ -35,6 +51,26 @@ export default function Home() {
       localStorage.setItem(STORAGE_KEY_FEATURE, activeTab);
     }
   }, [activeTab, mounted]);
+
+  // Show desktop-only message on mobile/small screens
+  if (!isDesktop) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black px-4">
+        <div className="text-center max-w-md">
+          <div className="mb-6">
+            <h1 className="text-4xl font-bold text-black dark:text-zinc-50 mb-2">MFOA Utils</h1>
+            <p className="text-zinc-600 dark:text-zinc-400">Utility tools powered by Rust WASM</p>
+          </div>
+          <div className="bg-zinc-100 dark:bg-zinc-800 rounded-lg p-8 border border-zinc-300 dark:border-zinc-700">
+            <div className="text-6xl mb-4">💻</div>
+            <h2 className="text-2xl font-semibold text-black dark:text-zinc-50 mb-3">Desktop Only</h2>
+            <p className="text-zinc-600 dark:text-zinc-400 mb-4">This application is optimized for desktop browsers and requires a screen width of at least 1024px.</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-500">Please access this site from a desktop or laptop computer for the best experience.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-start justify-center bg-zinc-50 font-sans dark:bg-black">

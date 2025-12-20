@@ -2,12 +2,15 @@ use aes_gcm::aead::Aead;
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use hex;
-use rand::RngCore;
+use rand::{Rng, RngCore};
 use sha2::{Digest, Sha256};
 use wasm_bindgen::prelude::*;
 
 const GCM_STANDARD_NONCE_SIZE: usize = 12;
 const AES_KEY_LENGTH: usize = 32;
+
+// Base62 alphabet: 0-9, a-z, A-Z (62 characters)
+const BASE62_ALPHABET: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 #[wasm_bindgen]
 pub fn hash_string(input: &str, salt: &str) -> String {
@@ -136,12 +139,15 @@ pub fn decrypt_with_nonce(key: &str, nonce: &str, ciphertext: &str) -> String {
 
 #[wasm_bindgen]
 pub fn generate_key() -> String {
-    // Generate 32 random bytes, return as base64 for easy transport
-    // The encryption functions will use key.as_bytes() which treats the base64 string as raw bytes
-    // This matches the Go implementation: []byte(key) where key is base64 string
-    let mut key_bytes = [0u8; AES_KEY_LENGTH];
-    rand::thread_rng().fill_bytes(&mut key_bytes);
-    BASE64.encode(&key_bytes)
+    // Generate 32 random base62 characters (0-9, a-z, A-Z)
+    // This produces a clean, URL-safe key that is exactly 32 bytes when converted with as_bytes()
+    // The encryption functions use key.as_bytes() which expects exactly 32 bytes
+    let mut rng = rand::thread_rng();
+    let key_chars: Vec<u8> = (0..AES_KEY_LENGTH)
+        .map(|_| BASE62_ALPHABET[rng.gen_range(0..62)])
+        .collect();
+    // Safe to use from_utf8_unchecked since BASE62_ALPHABET contains only ASCII characters
+    unsafe { String::from_utf8_unchecked(key_chars) }
 }
 
 #[wasm_bindgen]
