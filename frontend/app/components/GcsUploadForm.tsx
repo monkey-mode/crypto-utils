@@ -5,17 +5,25 @@ import { startTransition, useEffect, useLayoutEffect, useState } from "react";
 const STORAGE_KEY_BUCKET_NAME = "mfoa-utils-gcs-bucket-name";
 const STORAGE_KEY_PATH_LOCATION = "mfoa-utils-gcs-path-location";
 
+interface FileUploadProgress {
+  file: File;
+  progress: number;
+  status: "pending" | "uploading" | "processing" | "success" | "error";
+  error?: string;
+  objectName?: string;
+}
+
 export default function GcsUploadForm() {
   const [mounted, setMounted] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [bucketName, setBucketName] = useState("");
   const [pathLocation, setPathLocation] = useState("");
-  const [objectName, setObjectName] = useState("");
   const [serviceAccountJson, setServiceAccountJson] = useState("");
   const [serviceAccountJsonFocused, setServiceAccountJsonFocused] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<Map<string, FileUploadProgress>>(new Map());
 
   // Load saved bucket name and path location from localStorage and mark as mounted
   useLayoutEffect(() => {
@@ -54,21 +62,160 @@ export default function GcsUploadForm() {
   }, [pathLocation, mounted]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
+    const selectedFiles = Array.from(e.target.files || []);
+    if (selectedFiles.length > 0) {
+      setFiles(selectedFiles);
       setError(null);
       setSuccess(null);
-      // Auto-fill object name with file name if not set
-      if (!objectName) {
-        setObjectName(selectedFile.name);
-      }
+      // Initialize progress tracking for new files
+      const newProgress = new Map(uploadProgress);
+      selectedFiles.forEach((file) => {
+        if (!newProgress.has(file.name)) {
+          newProgress.set(file.name, {
+            file,
+            progress: 0,
+            status: "pending"
+          });
+        }
+      });
+      setUploadProgress(newProgress);
+    }
+  };
+
+  const uploadFile = async (file: File, index: number): Promise<void> => {
+    const fileKey = `${file.name}-${index}`;
+
+    // Update status to uploading
+    setUploadProgress((prev) => {
+      const updated = new Map(prev);
+      const current = updated.get(fileKey) || { file, progress: 0, status: "pending" as const };
+      updated.set(fileKey, { ...current, status: "uploading", progress: 0 });
+      return updated;
+    });
+
+    try {
+      // Use FormData for efficient large file uploads
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("bucketName", bucketName.trim());
+      formData.append("pathLocation", pathLocation.trim());
+      formData.append("fileName", file.name);
+      formData.append("fileType", file.type || "application/octet-stream");
+      formData.append("serviceAccountJson", serviceAccountJson);
+
+      // Create XMLHttpRequest for progress tracking
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+
+        // Track upload progress (client to server)
+        xhr.upload.addEventListener("progress", (e) => {
+          if (e.lengthComputable) {
+            const progress = Math.round((e.loaded / e.total) * 100);
+            setUploadProgress((prev) => {
+              const updated = new Map(prev);
+              const current = updated.get(fileKey);
+              if (current) {
+                updated.set(fileKey, { ...current, progress });
+              }
+              return updated;
+            });
+          }
+        });
+
+        // When upload completes, switch to "processing" while server uploads to GCS
+        xhr.upload.addEventListener("load", () => {
+          setUploadProgress((prev) => {
+            const updated = new Map(prev);
+            const current = updated.get(fileKey);
+            if (current) {
+              updated.set(fileKey, { ...current, status: "processing", progress: 100 });
+            }
+            return updated;
+          });
+        });
+
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const result = JSON.parse(xhr.responseText);
+              setUploadProgress((prev) => {
+                const updated = new Map(prev);
+                const current = updated.get(fileKey);
+                if (current) {
+                  updated.set(fileKey, {
+                    ...current,
+                    status: "success",
+                    progress: 100,
+                    objectName: result.objectName
+                  });
+                }
+                return updated;
+              });
+              resolve();
+            } catch {
+              reject(new Error("Failed to parse response"));
+            }
+          } else {
+            try {
+              const error = JSON.parse(xhr.responseText);
+              setUploadProgress((prev) => {
+                const updated = new Map(prev);
+                const current = updated.get(fileKey);
+                if (current) {
+                  updated.set(fileKey, {
+                    ...current,
+                    status: "error",
+                    error: error.error || "Upload failed"
+                  });
+                }
+                return updated;
+              });
+              reject(new Error(error.error || "Upload failed"));
+            } catch {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          }
+        });
+
+        xhr.addEventListener("error", () => {
+          setUploadProgress((prev) => {
+            const updated = new Map(prev);
+            const current = updated.get(fileKey);
+            if (current) {
+              updated.set(fileKey, {
+                ...current,
+                status: "error",
+                error: "Network error"
+              });
+            }
+            return updated;
+          });
+          reject(new Error("Network error"));
+        });
+
+        xhr.open("POST", "/api/gcs/upload");
+        xhr.send(formData);
+      });
+    } catch (err) {
+      setUploadProgress((prev) => {
+        const updated = new Map(prev);
+        const current = updated.get(fileKey);
+        if (current) {
+          updated.set(fileKey, {
+            ...current,
+            status: "error",
+            error: err instanceof Error ? err.message : "Upload failed"
+          });
+        }
+        return updated;
+      });
+      throw err;
     }
   };
 
   const handleUpload = async () => {
-    if (!file) {
-      setError("Please select a file to upload");
+    if (files.length === 0) {
+      setError("Please select at least one file to upload");
       return;
     }
 
@@ -88,9 +235,8 @@ export default function GcsUploadForm() {
     }
 
     // Validate JSON
-    let serviceAccount;
     try {
-      serviceAccount = JSON.parse(serviceAccountJson);
+      const serviceAccount = JSON.parse(serviceAccountJson);
       if (!serviceAccount.type || serviceAccount.type !== "service_account") {
         setError("Invalid service account JSON: must be a service account type");
         return;
@@ -104,39 +250,39 @@ export default function GcsUploadForm() {
     setError(null);
     setSuccess(null);
 
-    try {
-      // Read file as ArrayBuffer
-      const fileBuffer = await file.arrayBuffer();
-      const fileBytes = new Uint8Array(fileBuffer);
-
-      // Call API route
-      const response = await fetch("/api/gcs/upload", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          bucketName: bucketName.trim(),
-          pathLocation: pathLocation.trim(),
-          objectName: objectName.trim() || file.name,
-          serviceAccountJson: serviceAccount,
-          fileData: Array.from(fileBytes),
-          fileName: file.name,
-          fileType: file.type
-        })
+    // Initialize progress for all files
+    const newProgress = new Map<string, FileUploadProgress>();
+    files.forEach((file, index) => {
+      const fileKey = `${file.name}-${index}`;
+      newProgress.set(fileKey, {
+        file,
+        progress: 0,
+        status: "pending"
       });
+    });
+    setUploadProgress(newProgress);
 
-      const result = await response.json();
+    try {
+      // Upload files sequentially to avoid overwhelming the server
+      const uploadPromises = files.map((file, i) => uploadFile(file, i));
+      await Promise.allSettled(uploadPromises);
 
-      if (!response.ok) {
-        setError(result.error || "Upload failed");
-        return;
-      }
-
-      setSuccess(`File uploaded successfully to gs://${bucketName}/${pathLocation}/${result.objectName || objectName || file.name}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed. Please check the console for details.");
-      console.error(err);
+      // Check final status after all uploads complete
+      setTimeout(() => {
+        setUploadProgress((prev) => {
+          const successCount = Array.from(prev.values()).filter((p) => p.status === "success").length;
+          if (successCount === files.length) {
+            setSuccess(`Successfully uploaded ${successCount} file(s) to gs://${bucketName}/${pathLocation}`);
+          } else if (successCount > 0) {
+            const errorCount = files.length - successCount;
+            setError(`${errorCount} file(s) failed to upload. Check individual file status below.`);
+          }
+          return prev;
+        });
+      }, 100);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Upload failed. Please check the console for details.");
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -155,19 +301,26 @@ export default function GcsUploadForm() {
   };
 
   const handleClear = () => {
-    setFile(null);
+    setFiles([]);
     setBucketName("");
     setPathLocation("");
-    setObjectName("");
     setServiceAccountJson("");
     setServiceAccountJsonFocused(false);
     setError(null);
     setSuccess(null);
+    setUploadProgress(new Map());
     // Reset file input
     const fileInput = document.getElementById("gcs-file-input") as HTMLInputElement;
     if (fileInput) {
       fileInput.value = "";
     }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
   };
 
   if (!mounted) {
@@ -196,13 +349,22 @@ export default function GcsUploadForm() {
       <div className="space-y-3 mx-auto max-w-2xl">
         <div>
           <label htmlFor="gcs-file-input" className="block text-xs font-medium text-black dark:text-zinc-50 mb-1.5">
-            File to Upload
+            Files to Upload (Multiple files supported)
           </label>
-          <input id="gcs-file-input" type="file" onChange={handleFileChange} className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
-          {file && (
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-              Selected: {file.name} ({(file.size / 1024).toFixed(2)} KB)
-            </p>
+          <input id="gcs-file-input" type="file" multiple onChange={handleFileChange} className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
+          {files.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Selected {files.length} file(s) ({formatFileSize(files.reduce((sum, f) => sum + f.size, 0))})
+              </p>
+              <div className="max-h-32 overflow-y-auto space-y-1">
+                {files.map((file, index) => (
+                  <p key={`${file.name}-${index}`} className="text-xs text-zinc-600 dark:text-zinc-400 pl-2">
+                    • {file.name} ({formatFileSize(file.size)})
+                  </p>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
@@ -221,13 +383,46 @@ export default function GcsUploadForm() {
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Path within the bucket (e.g., &quot;uploads/2024&quot;)</p>
         </div>
 
-        <div>
-          <label htmlFor="object-name" className="block text-xs font-medium text-black dark:text-zinc-50 mb-1.5">
-            Object Name (Optional)
-          </label>
-          <input id="object-name" type="text" value={objectName} onChange={(e) => setObjectName(e.target.value)} placeholder="custom-filename.txt" className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">If not provided, the original filename will be used</p>
-        </div>
+        {uploadProgress.size > 0 && (
+          <div>
+            <label className="block text-xs font-medium text-black dark:text-zinc-50 mb-1.5">Upload Progress</label>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {Array.from(uploadProgress.entries()).map(([key, progress]) => (
+                <div key={key} className="border border-zinc-300 dark:border-zinc-700 rounded-lg p-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-black dark:text-zinc-50 truncate flex-1 mr-2">{progress.file.name}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded ${
+                      progress.status === "success" ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300" :
+                      progress.status === "error" ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300" :
+                      progress.status === "processing" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300" :
+                      progress.status === "uploading" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300" :
+                      "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+                    }`}>
+                      {progress.status === "success" ? "✓ Success" :
+                       progress.status === "error" ? "✗ Error" :
+                       progress.status === "processing" ? "⏳ Processing..." :
+                       progress.status === "uploading" ? `Uploading ${progress.progress}%` :
+                       "Pending"}
+                    </span>
+                  </div>
+                  {(progress.status === "uploading" || progress.status === "processing") && (
+                    <div className="w-full bg-zinc-200 dark:bg-zinc-700 rounded-full h-1.5 mt-1">
+                      <div className={`h-1.5 rounded-full transition-all duration-300 ${
+                        progress.status === "processing" ? "bg-yellow-500 animate-pulse" : "bg-blue-600"
+                      }`} style={{ width: `${progress.progress}%` }} />
+                    </div>
+                  )}
+                  {progress.status === "error" && progress.error && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{progress.error}</p>}
+                  {progress.status === "success" && progress.objectName && (
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                      gs://{bucketName}/{progress.objectName}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div>
           <label htmlFor="service-account-json" className="block text-xs font-medium text-black dark:text-zinc-50 mb-1.5">
@@ -238,8 +433,8 @@ export default function GcsUploadForm() {
         </div>
 
         <div className="flex gap-2">
-          <button onClick={handleUpload} disabled={loading || !file || !bucketName.trim() || !pathLocation.trim() || !serviceAccountJson.trim()} className="flex-1 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all active:scale-98 active:bg-blue-800 disabled:active:scale-100">
-            {loading ? "Uploading..." : "Upload to GCS"}
+          <button onClick={handleUpload} disabled={loading || files.length === 0 || !bucketName.trim() || !pathLocation.trim() || !serviceAccountJson.trim()} className="flex-1 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all active:scale-98 active:bg-blue-800 disabled:active:scale-100">
+            {loading ? `Uploading ${files.length} file(s)...` : `Upload ${files.length > 0 ? `${files.length} ` : ""}File(s) to GCS`}
           </button>
           <button onClick={handleClear} disabled={loading} className="px-4 py-2 text-sm bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 disabled:bg-zinc-400 disabled:cursor-not-allowed text-black dark:text-zinc-50 font-medium rounded-lg transition-all active:scale-98 disabled:active:scale-100">
             Clear
