@@ -1,6 +1,9 @@
 "use client";
 
-import { startTransition, useLayoutEffect, useState } from "react";
+import { startTransition, useEffect, useLayoutEffect, useState } from "react";
+
+const STORAGE_KEY_BUCKET_NAME = "mfoa-utils-gcs-bucket-name";
+const STORAGE_KEY_PATH_LOCATION = "mfoa-utils-gcs-path-location";
 
 export default function GcsUploadForm() {
   const [mounted, setMounted] = useState(false);
@@ -9,16 +12,46 @@ export default function GcsUploadForm() {
   const [pathLocation, setPathLocation] = useState("");
   const [objectName, setObjectName] = useState("");
   const [serviceAccountJson, setServiceAccountJson] = useState("");
+  const [serviceAccountJsonFocused, setServiceAccountJsonFocused] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Mark as mounted
+  // Load saved bucket name and path location from localStorage and mark as mounted
   useLayoutEffect(() => {
+    const savedBucketName = localStorage.getItem(STORAGE_KEY_BUCKET_NAME);
+    const savedPathLocation = localStorage.getItem(STORAGE_KEY_PATH_LOCATION);
     startTransition(() => {
+      if (savedBucketName) {
+        setBucketName(savedBucketName);
+      }
+      if (savedPathLocation) {
+        setPathLocation(savedPathLocation);
+      }
       setMounted(true);
     });
   }, []);
+
+  // Save bucket name and path location to localStorage when they change (only after mount)
+  useEffect(() => {
+    if (mounted) {
+      if (bucketName.trim()) {
+        localStorage.setItem(STORAGE_KEY_BUCKET_NAME, bucketName);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_BUCKET_NAME);
+      }
+    }
+  }, [bucketName, mounted]);
+
+  useEffect(() => {
+    if (mounted) {
+      if (pathLocation.trim()) {
+        localStorage.setItem(STORAGE_KEY_PATH_LOCATION, pathLocation);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_PATH_LOCATION);
+      }
+    }
+  }, [pathLocation, mounted]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -109,12 +142,25 @@ export default function GcsUploadForm() {
     }
   };
 
+  const handleServiceAccountJsonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setServiceAccountJson(e.target.value);
+  };
+
+  const handleServiceAccountJsonBlur = () => {
+    setServiceAccountJsonFocused(false);
+  };
+
+  const handleServiceAccountJsonFocus = () => {
+    setServiceAccountJsonFocused(true);
+  };
+
   const handleClear = () => {
     setFile(null);
     setBucketName("");
     setPathLocation("");
     setObjectName("");
     setServiceAccountJson("");
+    setServiceAccountJsonFocused(false);
     setError(null);
     setSuccess(null);
     // Reset file input
@@ -187,8 +233,8 @@ export default function GcsUploadForm() {
           <label htmlFor="service-account-json" className="block text-xs font-medium text-black dark:text-zinc-50 mb-1.5">
             Service Account JSON <span className="text-red-500">*</span>
           </label>
-          <textarea id="service-account-json" value={serviceAccountJson} onChange={(e) => setServiceAccountJson(e.target.value)} placeholder='{"type": "service_account", "project_id": "...", ...}' rows={8} className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 resize-y font-mono" />
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Paste your GCS service account JSON credentials</p>
+          <textarea id="service-account-json" value={serviceAccountJson} onChange={handleServiceAccountJsonChange} onBlur={handleServiceAccountJsonBlur} onFocus={handleServiceAccountJsonFocus} placeholder='{"type": "service_account", "project_id": "...", ...}' rows={8} className={`w-full px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 resize-y font-mono transition-all ${serviceAccountJson && !serviceAccountJsonFocused ? "" : ""}`} style={serviceAccountJson && !serviceAccountJsonFocused ? { filter: "blur(4px)" } : {}} />
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Paste your GCS service account JSON credentials {serviceAccountJson && !serviceAccountJsonFocused && "(blurred for security)"}</p>
         </div>
 
         <div className="flex gap-2">
