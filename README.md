@@ -22,6 +22,12 @@ A Next.js web application providing cryptographic utilities powered by Rust WebA
 - Custom output filename support
 - Manual download with download button
 
+### 🗝️ Tinker (Tink AEAD)
+- Encrypt/decrypt text or files with a base64 Tink cleartext keyset (AES-GCM)
+- Wire-compatible with tink-go AEAD (`insecurecleartextkeyset` binary keyset, base64-encoded)
+- Optional associated data (`EncryptWithAssociatedData` / `DecryptWithAssociatedData`)
+- Keyset generation (single AES-256-GCM key, TINK output prefix)
+
 ### 🎨 UI Features
 - Modern, responsive UI with dark mode support
 - Feature tabs for easy navigation

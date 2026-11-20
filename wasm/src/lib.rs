@@ -272,3 +272,57 @@ pub fn decrypt_file_with_nonce(
         .map_err(|e| JsValue::from_str(&format!("Decryption error: {:?}", e)))?;
     Ok(result)
 }
+
+// ---------------------------------------------------------------------------
+// Tinker (Tink AEAD / AES-GCM keyset) — compatible with tink-go AEAD
+// ---------------------------------------------------------------------------
+
+mod tinker;
+
+fn tinker_keyset(keyset_b64: &str) -> Result<tinker::Keyset, JsValue> {
+    tinker::parse_keyset(keyset_b64).map_err(|e| JsValue::from_str(&format!("Invalid keyset: {}", e)))
+}
+
+/// Generates a base64 Tink cleartext keyset with one AES-256-GCM key.
+#[wasm_bindgen]
+pub fn tinker_generate_keyset() -> String {
+    tinker::generate_keyset()
+}
+
+/// Encrypts text; returns base64 of the Tink ciphertext.
+#[wasm_bindgen]
+pub fn tinker_encrypt(keyset_b64: &str, data: &str, associated_data: &str) -> Result<String, JsValue> {
+    let ct = tinker_keyset(keyset_b64)?
+        .encrypt(data.as_bytes(), associated_data.as_bytes())
+        .map_err(|e| JsValue::from_str(&e))?;
+    Ok(BASE64.encode(ct))
+}
+
+/// Decrypts a base64 Tink ciphertext; returns the plaintext as UTF-8 text.
+#[wasm_bindgen]
+pub fn tinker_decrypt(keyset_b64: &str, ciphertext_b64: &str, associated_data: &str) -> Result<String, JsValue> {
+    let cleaned: String = ciphertext_b64.chars().filter(|c| !c.is_whitespace()).collect();
+    let ct = BASE64
+        .decode(cleaned)
+        .map_err(|_| JsValue::from_str("Invalid base64 ciphertext"))?;
+    let pt = tinker_keyset(keyset_b64)?
+        .decrypt(&ct, associated_data.as_bytes())
+        .map_err(|e| JsValue::from_str(&e))?;
+    Ok(String::from_utf8_lossy(&pt).to_string())
+}
+
+/// Encrypts raw file bytes; returns raw Tink ciphertext bytes.
+#[wasm_bindgen]
+pub fn tinker_encrypt_file(keyset_b64: &str, file_data: &[u8], associated_data: &str) -> Result<Vec<u8>, JsValue> {
+    tinker_keyset(keyset_b64)?
+        .encrypt(file_data, associated_data.as_bytes())
+        .map_err(|e| JsValue::from_str(&e))
+}
+
+/// Decrypts raw Tink ciphertext bytes; returns raw plaintext bytes.
+#[wasm_bindgen]
+pub fn tinker_decrypt_file(keyset_b64: &str, file_data: &[u8], associated_data: &str) -> Result<Vec<u8>, JsValue> {
+    tinker_keyset(keyset_b64)?
+        .decrypt(file_data, associated_data.as_bytes())
+        .map_err(|e| JsValue::from_str(&e))
+}

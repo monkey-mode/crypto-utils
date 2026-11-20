@@ -14,6 +14,11 @@ interface WasmModule {
   encrypt_file_with_nonce: (key: string, nonce: string, file_data: Uint8Array) => Uint8Array;
   decrypt_file: (key: string, file_data: Uint8Array) => Uint8Array;
   decrypt_file_with_nonce: (key: string, nonce: string, file_data: Uint8Array) => Uint8Array;
+  tinker_generate_keyset: () => string;
+  tinker_encrypt: (keyset: string, data: string, associated_data: string) => string;
+  tinker_decrypt: (keyset: string, ciphertext: string, associated_data: string) => string;
+  tinker_encrypt_file: (keyset: string, file_data: Uint8Array, associated_data: string) => Uint8Array;
+  tinker_decrypt_file: (keyset: string, file_data: Uint8Array, associated_data: string) => Uint8Array;
 }
 
 interface WasmContextType {
