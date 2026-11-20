@@ -5,8 +5,9 @@ import EncryptDecryptFileForm from "./components/EncryptDecryptFileForm";
 import EncryptDecryptForm from "./components/EncryptDecryptForm";
 import GcsUploadForm from "./components/GcsUploadForm";
 import HashForm from "./components/HashForm";
+import TinkerForm from "./components/TinkerForm";
 
-type FeatureTab = "feature1" | "feature2" | "feature3" | "feature4";
+type FeatureTab = "feature1" | "feature2" | "feature3" | "feature4" | "feature5";
 
 const STORAGE_KEY_FEATURE = "mfoa-utils-active-feature";
 const MIN_DESKTOP_WIDTH = 1024; // Minimum width for desktop (lg breakpoint)
@@ -36,7 +37,7 @@ export default function Home() {
   useLayoutEffect(() => {
     const savedFeature = localStorage.getItem(STORAGE_KEY_FEATURE);
     startTransition(() => {
-      if (savedFeature && (savedFeature === "feature1" || savedFeature === "feature2" || savedFeature === "feature3" || savedFeature === "feature4")) {
+      if (savedFeature && (savedFeature === "feature1" || savedFeature === "feature2" || savedFeature === "feature3" || savedFeature === "feature4" || savedFeature === "feature5")) {
         setActiveTab(savedFeature as FeatureTab);
       }
       // Smooth transition by delaying mount slightly
@@ -102,6 +103,10 @@ export default function Home() {
                 <span className="text-base">☁️</span>
                 <span>GCS Upload</span>
               </button>
+              <button onClick={() => setActiveTab("feature5")} className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${activeTab === "feature5" ? "bg-white dark:bg-zinc-700 text-black dark:text-zinc-50 shadow-sm" : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-zinc-50"}`}>
+                <span className="text-base">🗝️</span>
+                <span>Tinker</span>
+              </button>
             </div>
           )}
 
@@ -122,6 +127,10 @@ export default function Home() {
 
               <div className={activeTab === "feature4" ? "" : "hidden"}>
                 <GcsUploadForm />
+              </div>
+
+              <div className={activeTab === "feature5" ? "" : "hidden"}>
+                <TinkerForm />
               </div>
             </>
           )}
